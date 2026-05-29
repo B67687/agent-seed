@@ -2,7 +2,7 @@
 # agent-seed: self-improvement bootstrap
 #
 # Aggregates project state to seed the next improvement decision.
-# Run at the start of a session to surface context.
+# Uses scripts/eval --json for capability analysis.
 #
 # Usage: bash scripts/improve
 set -e
@@ -36,34 +36,47 @@ find . -maxdepth 2 -not -path './.git/*' -not -path './.git' \
   | head -40
 echo ""
 
-# 5. Gap analysis — where are we vs. the goal?
-echo "--- SUGGESTED NEXT STEPS (heuristic) ---"
+# 5. Gap analysis — from eval
+echo "--- EVAL SUMMARY ---"
+if command -v jq >/dev/null 2>&1 && [ -f scripts/eval ]; then
+  EVAL_JSON=$(bash scripts/eval --json 2>/dev/null || echo "")
+  if [ -n "$EVAL_JSON" ]; then
+    SCORE=$(echo "$EVAL_JSON" | jq -r '.score')
+    PASSED=$(echo "$EVAL_JSON" | jq -r '.passed')
+    TOTAL=$(echo "$EVAL_JSON" | jq -r '.total')
+    echo "  score:  $SCORE/100"
+    echo "  passed: $PASSED / $TOTAL"
+    echo ""
 
-# Count existing capabilities
-HAS_EVAL=$(test -f scripts/eval && echo "yes" || echo "no")
-HAS_MODEL_CFG=$(test -f .model-config.json && echo "yes" || echo "no")
-HAS_TESTS=$(ls tests/ 2>/dev/null | head -1 | wc -l)
-NUM_SCRIPTS=$(ls scripts/ 2>/dev/null | wc -l)
+    # Show failing checks
+    FAILURES=$(echo "$EVAL_JSON" | jq -r '.checks[] | select(.status == "FAIL") | "  ✗ \(.check)"' 2>/dev/null)
+    if [ -n "$FAILURES" ]; then
+      echo "  failing checks:"
+      echo "$FAILURES"
+    fi
+    echo ""
 
-echo "  scripts/ dir entries: $NUM_SCRIPTS"
-echo "  eval capability: $HAS_EVAL"
-echo "  model config: $HAS_MODEL_CFG"
-echo "  tests: $HAS_TESTS"
-echo ""
+    # Suggest next steps based on failures
+    echo "--- SUGGESTED NEXT STEPS ---"
+    echo "$EVAL_JSON" | jq -r '.checks[] | select(.status == "FAIL") | .check' 2>/dev/null | while read -r check; do
+      case "$check" in
+        *"model config"*)     echo "  [+] Create .model-config.json" ;;
+        *"tests"*)            echo "  [+] Create tests/ — add verification" ;;
+        *"route"*)            echo "  [+] Create scripts/route — model resolver" ;;
+        *"eval"*)             echo "  [+] Create scripts/eval — measurement" ;;
+        *"improve"*)          echo "  [+] Create scripts/improve — iteration loop" ;;
+        "working tree clean"*) echo "  [+] Commit working changes" ;;
+        *)                    echo "  [+] Fix: $check" ;;
+      esac
+    done
+    echo ""
+  else
+    echo "  (eval JSON failed — check scripts/eval)"
+    echo ""
+  fi
+else
+  echo "  (jq or scripts/eval not available)"
+  echo ""
+fi
 
-# Heuristic suggestions based on gaps
-if [ "$NUM_SCRIPTS" -le 2 ]; then
-  echo "  [+] Bootstrap the harness core — scripts are minimal"
-fi
-if [ "$HAS_EVAL" = "no" ]; then
-  echo "  [+] Add eval capability — no way to measure improvement"
-fi
-if [ "$HAS_MODEL_CFG" = "no" ]; then
-  echo "  [+] Add model-agnostic config — no abstraction layer yet"
-fi
-if [ "$HAS_TESTS" -eq 0 ]; then
-  echo "  [+] Add tests — no verification mechanism"
-fi
-
-echo ""
 echo "=== end ==="

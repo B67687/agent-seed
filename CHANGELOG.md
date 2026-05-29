@@ -31,4 +31,13 @@ Created the first piece of the model-agnostic abstraction: a routing config and 
 
 Remaining gap (one failure): no `tests/` directory.
 
+## 2026-05-29 :: integrate improve with eval --json
+
+Upgraded `scripts/improve` to consume `scripts/eval --json` for capability analysis, replacing the duplicate file-existence heuristics. The self-improvement loop is now coherent: `evaluates → surfaces gaps → suggests next steps` in one pipeline.
+
+- Replaced heuristic section in `scripts/improve` with jq-parsed eval JSON output
+- Improve now shows: eval score, passed/total, failing checks, and mapped next-step suggestions
+- `scripts/improve` cleanly delegates analysis to `scripts/eval` — single source of truth for what's broken
+- Remaining gap: no `tests/` directory
+
 Seed created.
