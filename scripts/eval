@@ -101,10 +101,12 @@ run_check "last commit: $LAST_MSG" test -n "$LAST_MSG"
 
 section "Capabilities"
 
-run_check "self-eval exists"     test -f scripts/eval
-run_check "improve exists"       test -f scripts/improve
-run_check "model config exists"  test -f .model-config.json
-run_check "tests exist"          bash -c 'test -d tests && ls -A tests/ 2>/dev/null | grep -q .'
+run_check "self-eval exists"       test -f scripts/eval
+run_check "improve exists"         test -f scripts/improve
+run_check "route resolver exists"  test -f scripts/route
+run_check "model config exists"    test -f .model-config.json
+run_check "config validates"       bash scripts/route --check >/dev/null 2>&1
+run_check "tests exist"            bash -c 'test -d tests && ls -A tests/ 2>/dev/null | grep -q .'
 
 section "Harness Integrity"
 

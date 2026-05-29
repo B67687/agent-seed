@@ -20,4 +20,15 @@ Key design:
 - `--json` output designed for consumption by `scripts/improve` in future sessions
 - Bugfix: functions were not `set -e` safe — `[ cond ] && echo` as last statement returned exit code 1 in normal mode, crashing the script silently. Refactored to use `if` blocks and `verbose_echo` helper.
 
+## 2026-05-29 :: add model-agnostic routing layer
+
+Created the first piece of the model-agnostic abstraction: a routing config and resolver that define which models handle which task types. This directly addresses the "model-agnostic" part of the goal.
+
+- `.model-config.json` — routing configuration defining 8 task routes, 3 providers (deepseek, opencode, openrouter), cost tiers, fallback chain, and cost optimization strategy
+- `scripts/route` — config resolver that reads `.model-config.json` and resolves a task type to a model. Modes: resolve (default), `--list`, `--fallback`, `--check`
+- Updated `scripts/eval` — added route resolver and config validation checks
+- Eval score improved from 88→90 (model config + route resolver now passing)
+
+Remaining gap (one failure): no `tests/` directory.
+
 Seed created.

@@ -1,0 +1,98 @@
+#!/bin/bash
+# agent-seed: model-agnostic route resolver
+#
+# Reads .model-config.json and resolves a task type to a model.
+#
+# Usage:
+#   bash scripts/route <task-type>         # resolve model for a task
+#   bash scripts/route --list              # show all routes
+#   bash scripts/route --fallback <type>   # walk fallback chain
+#   bash scripts/route --check             # validate config
+set -e
+
+CONFIG=".model-config.json"
+
+usage() {
+  echo "Usage: bash scripts/route <task-type>"
+  echo "       bash scripts/route --list"
+  echo "       bash scripts/route --fallback <type>"
+  echo "       bash scripts/route --check"
+  exit 1
+}
+
+[ -f "$CONFIG" ] || { echo "error: $CONFIG not found"; exit 1; }
+command -v jq >/dev/null 2>&1 || { echo "error: jq required"; exit 1; }
+
+MODE="resolve"
+TARGET=""
+
+for arg in "$@"; do
+  case "$arg" in
+    --list)     MODE="list" ;;
+    --fallback) MODE="fallback" ;;
+    --check)    MODE="check" ;;
+    --help|-h)  usage ;;
+    *)          TARGET="$arg" ;;
+  esac
+done
+
+case "$MODE" in
+  resolve)
+    [ -z "$TARGET" ] && usage
+    MODEL=$(jq -r --arg t "$TARGET" '.routes[$t].model // "unknown"' "$CONFIG")
+    ACCESS=$(jq -r --arg t "$TARGET" '.routes[$t].access // "unknown"' "$CONFIG")
+    DESC=$(jq -r --arg t "$TARGET" '.routes[$t].description // ""' "$CONFIG")
+    if [ "$MODEL" = "unknown" ]; then
+      echo "error: unknown task type '$TARGET'" >&2
+      echo "valid types:"
+      jq -r '.routes | keys | .[]' "$CONFIG" | sort | sed 's/^/  /'
+      exit 1
+    fi
+    echo "$TARGET → $MODEL ($ACCESS)"
+    [ -n "$DESC" ] && echo "  $DESC"
+    ;;
+  list)
+    echo "=== routes ==="
+    jq -r '.routes | to_entries[] | "\(.key) → \(.value.model) (\(.value.access))\n  \(.value.description)"' "$CONFIG"
+    echo ""
+    echo "=== fallback chain ==="
+    jq -r '.fallback_chain[]' "$CONFIG" | sed 's/^/  /'
+    ;;
+  fallback)
+    [ -z "$TARGET" ] && usage
+    echo "fallback chain for $TARGET:"
+    jq -r --arg t "$TARGET" '
+      [.routes[$t].model] + .fallback_chain | unique | .[]
+    ' "$CONFIG" | sed 's/^/  /'
+    ;;
+  check)
+    ERRORS=0
+    # Validate all route models reference valid providers
+    ROUTE_NAMES=$(jq -r '.routes | keys | .[]' "$CONFIG")
+    ALL_MODELS=$(jq -r '[.routes[].model] | unique | .[]' "$CONFIG")
+    KNOWN_MODELS=$(jq -r '[.providers[].models | keys] | flatten | unique | .[]' "$CONFIG")
+    
+    while IFS= read -r model; do
+      if ! echo "$KNOWN_MODELS" | grep -q "^${model}$"; then
+        echo "  WARN: model '$model' in routes but not defined in providers" >&2
+        ERRORS=$((ERRORS + 1))
+      fi
+    done <<< "$ALL_MODELS"
+    
+    # Validate fallback models
+    FALLBACK_MODELS=$(jq -r '.fallback_chain[]' "$CONFIG")
+    while IFS= read -r model; do
+      if ! echo "$KNOWN_MODELS" | grep -q "^${model}$"; then
+        echo "  WARN: fallback model '$model' not defined in providers" >&2
+        ERRORS=$((ERRORS + 1))
+      fi
+    done <<< "$FALLBACK_MODELS"
+    
+    if [ "$ERRORS" -eq 0 ]; then
+      echo "config valid — $(jq '.routes | length' "$CONFIG") routes, $(jq '.fallback_chain | length' "$CONFIG") fallbacks"
+    else
+      echo "config has $ERRORS warnings"
+      exit 1
+    fi
+    ;;
+esac

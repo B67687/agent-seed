@@ -1,0 +1,87 @@
+{
+  "version": 1,
+  "comment": "Model-agnostic routing configuration for agent-seed harness",
+
+  "providers": {
+    "deepseek": {
+      "type": "direct",
+      "base_url": "https://api.deepseek.com/v1",
+      "models": {
+        "deepseek-v4-flash": { "cost_tier": "paid" }
+      }
+    },
+    "opencode": {
+      "type": "free",
+      "models": {
+        "deepseek-v4-flash-free": { "cost_tier": "free" }
+      }
+    },
+    "openrouter": {
+      "type": "api",
+      "models": {
+        "deepseek-v4-flash:free": { "cost_tier": "free" },
+        "meta-llama/llama-3.3-70b-instruct:free": { "cost_tier": "free" }
+      }
+    }
+  },
+
+  "routes": {
+    "orchestrator": {
+      "model": "deepseek-v4-flash",
+      "access": "read_write",
+      "description": "Primary session — route to subagents before acting directly"
+    },
+    "explore": {
+      "model": "deepseek-v4-flash-free",
+      "access": "read_only",
+      "description": "Bulk search, repo mapping, file discovery"
+    },
+    "worker": {
+      "model": "deepseek-v4-flash-free",
+      "access": "read_write",
+      "description": "Implementation, refactoring, testing"
+    },
+    "review": {
+      "model": "deepseek-v4-flash-free",
+      "access": "read_only",
+      "description": "Code review, diff review, bug detection"
+    },
+    "plan": {
+      "model": "deepseek-v4-flash-free",
+      "access": "read_only",
+      "description": "Planning, analysis, design docs"
+    },
+    "general": {
+      "model": "deepseek-v4-flash-free",
+      "access": "read_write",
+      "description": "Complex research, multi-step tasks"
+    },
+    "scout": {
+      "model": "deepseek-v4-flash-free",
+      "access": "read_only",
+      "description": "External dependency research, library inspection"
+    },
+    "architect": {
+      "model": "deepseek-v4-flash",
+      "access": "read_only",
+      "description": "Strategic architectural thinking, cross-domain patterns"
+    }
+  },
+
+  "fallback_chain": [
+    "deepseek-v4-flash",
+    "deepseek-v4-flash-free",
+    "deepseek-v4-flash:free",
+    "meta-llama/llama-3.3-70b-instruct:free"
+  ],
+
+  "cost_optimization": {
+    "strategy": "free_first",
+    "delegate_before_act": true,
+    "direct_thresholds": {
+      "search_max_files": 2,
+      "edit_max_files": 1,
+      "edit_max_lines": 5
+    }
+  }
+}
