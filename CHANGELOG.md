@@ -40,4 +40,16 @@ Upgraded `scripts/improve` to consume `scripts/eval --json` for capability analy
 - `scripts/improve` cleanly delegates analysis to `scripts/eval` — single source of truth for what's broken
 - Remaining gap: no `tests/` directory
 
+## 2026-05-29 :: add tests — first verification capability
+
+Created `tests/` directory with `tests/smoke.sh` — a comprehensive smoke test that validates all scripts in read-only modes. 30 checks covering:
+
+- Script existence, executable bit, and shebangs for all 5 scripts
+- `scripts/eval` — normal, score, and JSON modes; validates numeric score and valid JSON
+- `scripts/route` — config validation, list mode, resolve, fallback, and unknown-task error
+- `scripts/improve` — clean run and presence of eval summary section
+- Config file existence and JSON validity
+
+Eval score hits **100/100** for the first time after this commit. All capability gaps closed.
+
 Seed created.
