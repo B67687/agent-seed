@@ -1,3 +1,11 @@
 # agent-seed changelog
 
+## 2026-05-29 :: bootstrap self-improvement loop
+
+Created `scripts/improve` — a state-aggregation tool that surfaces GOAL, CHANGELOG, git state, project tree, and heuristic gap analysis. This is the first piece of self-improvement infrastructure. Without it, every session requires manual context gathering. With it, the AI has a repeatable discovery process to decide the next step.
+
+- Wrote `scripts/improve` (bash) — reads project state, outputs structured context, suggests next steps based on detected gaps
+- Heuristic checks: scripts count, eval capability, model config, test presence
+- First call to `scripts/improve` reveals: no eval, no model config, no tests
+
 Seed created.

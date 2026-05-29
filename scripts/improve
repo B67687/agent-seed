@@ -1,0 +1,69 @@
+#!/bin/bash
+# agent-seed: self-improvement bootstrap
+#
+# Aggregates project state to seed the next improvement decision.
+# Run at the start of a session to surface context.
+#
+# Usage: bash scripts/improve
+set -e
+
+echo "=== agent-seed :: self-improvement loop ==="
+echo ""
+
+# 1. Goal
+echo "--- GOAL ---"
+cat GOAL.md 2>/dev/null || echo "(missing GOAL.md)"
+echo ""
+
+# 2. Changelog (last 5 entries)
+echo "--- CHANGELOG (tail) ---"
+tail -20 CHANGELOG.md 2>/dev/null || echo "(missing CHANGELOG.md)"
+echo ""
+
+# 3. Git state
+echo "--- GIT STATUS ---"
+git status --short 2>/dev/null || echo "(not a git repo)"
+echo ""
+
+echo "--- RECENT COMMITS ---"
+git log --oneline -5 2>/dev/null || echo "(no commits)"
+echo ""
+
+# 4. File overview
+echo "--- PROJECT TREE ---"
+find . -maxdepth 2 -not -path './.git/*' -not -path './.git' \
+  | sort \
+  | head -40
+echo ""
+
+# 5. Gap analysis — where are we vs. the goal?
+echo "--- SUGGESTED NEXT STEPS (heuristic) ---"
+
+# Count existing capabilities
+HAS_EVAL=$(test -f scripts/eval && echo "yes" || echo "no")
+HAS_MODEL_CFG=$(test -f .model-config.json && echo "yes" || echo "no")
+HAS_TESTS=$(ls tests/ 2>/dev/null | head -1 | wc -l)
+NUM_SCRIPTS=$(ls scripts/ 2>/dev/null | wc -l)
+
+echo "  scripts/ dir entries: $NUM_SCRIPTS"
+echo "  eval capability: $HAS_EVAL"
+echo "  model config: $HAS_MODEL_CFG"
+echo "  tests: $HAS_TESTS"
+echo ""
+
+# Heuristic suggestions based on gaps
+if [ "$NUM_SCRIPTS" -le 2 ]; then
+  echo "  [+] Bootstrap the harness core — scripts are minimal"
+fi
+if [ "$HAS_EVAL" = "no" ]; then
+  echo "  [+] Add eval capability — no way to measure improvement"
+fi
+if [ "$HAS_MODEL_CFG" = "no" ]; then
+  echo "  [+] Add model-agnostic config — no abstraction layer yet"
+fi
+if [ "$HAS_TESTS" -eq 0 ]; then
+  echo "  [+] Add tests — no verification mechanism"
+fi
+
+echo ""
+echo "=== end ==="
