@@ -1,0 +1,14 @@
+#!/bin/bash
+# agent-seed --- iteration protocol
+#
+# Read this at the start of every session.
+# This is the one loop. Follow it every time.
+#
+# 1. Read GOAL.md
+# 2. Read CHANGELOG.md
+# 3. Survey the current state (ls, git status, git log)
+# 4. Decide ONE next step that moves toward the goal
+# 5. Do it
+# 6. Update CHANGELOG.md with what happened and why
+# 7. Run: bash scripts/commit "<summary of what was done>"
+# 8. Repeat

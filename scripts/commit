@@ -1,0 +1,6 @@
+#!/bin/bash
+# Safe commit wrapper.
+# Usage: bash scripts/commit "what changed and why"
+set -e
+git add -A
+git commit -m "$*" 2>/dev/null || echo "(nothing to commit)"

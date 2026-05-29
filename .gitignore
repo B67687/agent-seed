@@ -1,0 +1,6 @@
+# agent-seed gitignore
+# Minimal --- the seed discovers what it needs
+__pycache__/
+*.pyc
+node_modules/
+.env
