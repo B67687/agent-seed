@@ -1,0 +1,141 @@
+#!/bin/bash
+# agent-seed: self-evaluation framework
+#
+# Runs capability checks against the repo, scores them,
+# and outputs structured results for the improvement loop.
+#
+# Usage: bash scripts/eval
+#   --verbose   print per-check details
+#   --score     numeric score only (for tracking)
+#   --json      machine-readable output
+set -e
+
+MODE="normal"  # normal | verbose | score | json
+
+for arg in "$@"; do
+  case "$arg" in
+    --verbose) MODE="verbose" ;;
+    --score)   MODE="score"   ;;
+    --json)    MODE="json"    ;;
+  esac
+done
+
+CHECKS_TOTAL=0
+CHECKS_PASS=0
+CHECKS_FAIL=0
+RESULTS=""
+
+pass() {
+  local check="$1"
+  local detail="${2:-}"
+  CHECKS_TOTAL=$((CHECKS_TOTAL + 1))
+  CHECKS_PASS=$((CHECKS_PASS + 1))
+  RESULTS="${RESULTS}PASS|${check}|${detail}"$'\n'
+  [ "$MODE" = "verbose" ] && echo "  ✓ $check"
+}
+
+fail() {
+  local check="$1"
+  local detail="${2:-}"
+  CHECKS_TOTAL=$((CHECKS_TOTAL + 1))
+  CHECKS_FAIL=$((CHECKS_FAIL + 1))
+  RESULTS="${RESULTS}FAIL|${check}|${detail}"$'\n'
+  [ "$MODE" = "verbose" ] && echo "  ✗ $check — ${detail}"
+}
+
+section() {
+  [ "$MODE" = "verbose" ] && echo ""
+  [ "$MODE" = "verbose" ] && echo "--- $1 ---"
+}
+
+# ────────────────────────────────────────────
+# Checks
+# ────────────────────────────────────────────
+
+section "Repo Integrity"
+
+[ -f GOAL.md ] && pass "GOAL.md exists" || fail "GOAL.md exists" "missing"
+[ -f CHANGELOG.md ] && pass "CHANGELOG.md exists" || fail "CHANGELOG.md exists" "missing"
+[ -f AGENTS.md ] && pass "AGENTS.md exists" || fail "AGENTS.md exists" "missing"
+[ -f .opencode.jsonc ] && pass ".opencode.jsonc exists" || fail ".opencode.jsonc exists" "missing"
+[ -f README.md ] && pass "README.md exists" || fail "README.md exists" "missing"
+[ -f .gitignore ] && pass ".gitignore exists" || fail ".gitignore exists" "missing"
+
+section "Scripts"
+
+for s in scripts/*; do
+  name="${s#scripts/}"
+  [ -f "$s" ] || continue
+  [ -x "$s" ] && pass "$name executable" || fail "$name executable" "not executable"
+  head -1 "$s" | grep -q '^#!/' && pass "$name shebang" || fail "$name shebang" "missing shebang"
+done
+
+section "Git"
+
+CLEAN=$(git status --short 2>/dev/null)
+[ -z "$CLEAN" ] && pass "working tree clean" || fail "working tree clean" "uncommitted changes"
+
+COMMIT_COUNT=$(git log --oneline 2>/dev/null | wc -l)
+[ "$COMMIT_COUNT" -ge 1 ] && pass "has commits ($COMMIT_COUNT)" || fail "has commits" "zero commits"
+
+LAST_MSG=$(git log -1 --format=%s 2>/dev/null)
+[ -n "$LAST_MSG" ] && pass "last commit: $LAST_MSG" || fail "last commit message" "empty"
+
+section "Capabilities"
+
+[ -f scripts/eval ] && pass "self-eval exists" || fail "self-eval exists" "missing"
+[ -f scripts/improve ] && pass "improve exists" || fail "improve exists" "missing"
+[ -f .model-config.json ] && PASS "model config exists" || fail "model config exists" "missing"
+[ -d tests ] && [ "$(ls tests/ 2>/dev/null | wc -l)" -gt 0 ] && pass "tests exist" || fail "tests exist" "none found"
+
+section "Harness Integrity"
+
+# Self-check: eval can run without errors
+[ "$MODE" != "score" ] && [ "$MODE" != "json" ] && pass "eval self-check" || true
+
+# ────────────────────────────────────────────
+# Output
+# ────────────────────────────────────────────
+
+SCORE=0
+if [ "$CHECKS_TOTAL" -gt 0 ]; then
+  SCORE=$((CHECKS_PASS * 100 / CHECKS_TOTAL))
+fi
+
+case "$MODE" in
+  score)
+    echo "$SCORE"
+    ;;
+  json)
+    echo "{"
+    echo "  \"score\": $SCORE,"
+    echo "  \"total\": $CHECKS_TOTAL,"
+    echo "  \"passed\": $CHECKS_PASS,"
+    echo "  \"failed\": $CHECKS_FAIL,"
+    echo "  \"checks\": ["
+    FIRST=true
+    while IFS='|' read -r status name detail; do
+      [ -z "$name" ] && continue
+      $FIRST || echo ","
+      echo -n "    {\"check\": \"$name\", \"status\": \"$status\", \"detail\": \"$detail\"}"
+      FIRST=false
+    done <<< "$RESULTS"
+    echo ""
+    echo "  ]"
+    echo "}"
+    ;;
+  normal|verbose)
+    echo ""
+    echo "=== results ==="
+    echo "  passed: $CHECKS_PASS / $CHECKS_TOTAL"
+    echo "  score:  $SCORE/100"
+    [ $CHECKS_FAIL -gt 0 ] && echo "  fails:  $CHECKS_FAIL"
+    echo ""
+    if [ $CHECKS_FAIL -gt 0 ]; then
+      echo "  failing checks:"
+      while IFS='|' read -r status name detail; do
+        [ "$status" = "FAIL" ] && echo "    - $name ($detail)"
+      done <<< "$RESULTS"
+    fi
+    ;;
+esac

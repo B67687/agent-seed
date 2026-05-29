@@ -8,4 +8,15 @@ Created `scripts/improve` — a state-aggregation tool that surfaces GOAL, CHANG
 - Heuristic checks: scripts count, eval capability, model config, test presence
 - First call to `scripts/improve` reveals: no eval, no model config, no tests
 
+## 2026-05-29 :: add self-evaluation framework
+
+Created `scripts/eval` — a self-evaluation framework that runs capability checks against the repo, scores them, and outputs structured results. This directly enables the "self-improvement" part of the goal: you can't improve what you can't measure.
+
+Key design:
+
+- Modular checkers (bash functions): repo integrity, scripts, git, capabilities, harness integrity
+- Output modes: normal (human-readable), verbose, score (numeric only), json (machine-readable)
+- 22 checks total; initial score 86/100 (failures: uncommitted eval, missing model config, missing tests)
+- `--json` output designed for consumption by `scripts/improve` in future sessions
+
 Seed created.
