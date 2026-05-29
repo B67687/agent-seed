@@ -25,13 +25,19 @@ CHECKS_PASS=0
 CHECKS_FAIL=0
 RESULTS=""
 
+verbose_echo() {
+  if [ "$MODE" = "verbose" ]; then
+    echo "$1"
+  fi
+}
+
 pass() {
   local check="$1"
   local detail="${2:-}"
   CHECKS_TOTAL=$((CHECKS_TOTAL + 1))
   CHECKS_PASS=$((CHECKS_PASS + 1))
   RESULTS="${RESULTS}PASS|${check}|${detail}"$'\n'
-  [ "$MODE" = "verbose" ] && echo "  ✓ $check"
+  verbose_echo "  ✓ $check"
 }
 
 fail() {
@@ -40,12 +46,24 @@ fail() {
   CHECKS_TOTAL=$((CHECKS_TOTAL + 1))
   CHECKS_FAIL=$((CHECKS_FAIL + 1))
   RESULTS="${RESULTS}FAIL|${check}|${detail}"$'\n'
-  [ "$MODE" = "verbose" ] && echo "  ✗ $check — ${detail}"
+  verbose_echo "  ✗ $check — ${detail}"
 }
 
 section() {
-  [ "$MODE" = "verbose" ] && echo ""
-  [ "$MODE" = "verbose" ] && echo "--- $1 ---"
+  if [ "$MODE" = "verbose" ]; then
+    echo ""
+    echo "--- $1 ---"
+  fi
+}
+
+run_check() {
+  local check_name="$1"
+  shift
+  if "$@"; then
+    pass "$check_name"
+  else
+    fail "$check_name"
+  fi
 }
 
 # ────────────────────────────────────────────
@@ -54,44 +72,46 @@ section() {
 
 section "Repo Integrity"
 
-[ -f GOAL.md ] && pass "GOAL.md exists" || fail "GOAL.md exists" "missing"
-[ -f CHANGELOG.md ] && pass "CHANGELOG.md exists" || fail "CHANGELOG.md exists" "missing"
-[ -f AGENTS.md ] && pass "AGENTS.md exists" || fail "AGENTS.md exists" "missing"
-[ -f .opencode.jsonc ] && pass ".opencode.jsonc exists" || fail ".opencode.jsonc exists" "missing"
-[ -f README.md ] && pass "README.md exists" || fail "README.md exists" "missing"
-[ -f .gitignore ] && pass ".gitignore exists" || fail ".gitignore exists" "missing"
+run_check "GOAL.md exists"        test -f GOAL.md
+run_check "CHANGELOG.md exists"   test -f CHANGELOG.md
+run_check "AGENTS.md exists"      test -f AGENTS.md
+run_check ".opencode.jsonc exists" test -f .opencode.jsonc
+run_check "README.md exists"      test -f README.md
+run_check ".gitignore exists"     test -f .gitignore
 
 section "Scripts"
 
 for s in scripts/*; do
-  name="${s#scripts/}"
   [ -f "$s" ] || continue
-  [ -x "$s" ] && pass "$name executable" || fail "$name executable" "not executable"
-  head -1 "$s" | grep -q '^#!/' && pass "$name shebang" || fail "$name shebang" "missing shebang"
+  name="${s#scripts/}"
+  run_check "$name executable" test -x "$s"
+  run_check "$name shebang"    head -1 "$s" | grep -q '^#!/'
 done
 
 section "Git"
 
 CLEAN=$(git status --short 2>/dev/null)
-[ -z "$CLEAN" ] && pass "working tree clean" || fail "working tree clean" "uncommitted changes"
+run_check "working tree clean" test -z "$CLEAN"
 
 COMMIT_COUNT=$(git log --oneline 2>/dev/null | wc -l)
-[ "$COMMIT_COUNT" -ge 1 ] && pass "has commits ($COMMIT_COUNT)" || fail "has commits" "zero commits"
+run_check "has commits ($COMMIT_COUNT)" test "$COMMIT_COUNT" -ge 1
 
 LAST_MSG=$(git log -1 --format=%s 2>/dev/null)
-[ -n "$LAST_MSG" ] && pass "last commit: $LAST_MSG" || fail "last commit message" "empty"
+run_check "last commit: $LAST_MSG" test -n "$LAST_MSG"
 
 section "Capabilities"
 
-[ -f scripts/eval ] && pass "self-eval exists" || fail "self-eval exists" "missing"
-[ -f scripts/improve ] && pass "improve exists" || fail "improve exists" "missing"
-[ -f .model-config.json ] && PASS "model config exists" || fail "model config exists" "missing"
-[ -d tests ] && [ "$(ls tests/ 2>/dev/null | wc -l)" -gt 0 ] && pass "tests exist" || fail "tests exist" "none found"
+run_check "self-eval exists"     test -f scripts/eval
+run_check "improve exists"       test -f scripts/improve
+run_check "model config exists"  test -f .model-config.json
+run_check "tests exist"          bash -c 'test -d tests && ls -A tests/ 2>/dev/null | grep -q .'
 
 section "Harness Integrity"
 
 # Self-check: eval can run without errors
-[ "$MODE" != "score" ] && [ "$MODE" != "json" ] && pass "eval self-check" || true
+if [ "$MODE" != "score" ] && [ "$MODE" != "json" ]; then
+  pass "eval self-check"
+fi
 
 # ────────────────────────────────────────────
 # Output
@@ -116,9 +136,12 @@ case "$MODE" in
     FIRST=true
     while IFS='|' read -r status name detail; do
       [ -z "$name" ] && continue
-      $FIRST || echo ","
+      if [ "$FIRST" = true ]; then
+        FIRST=false
+      else
+        echo ","
+      fi
       echo -n "    {\"check\": \"$name\", \"status\": \"$status\", \"detail\": \"$detail\"}"
-      FIRST=false
     done <<< "$RESULTS"
     echo ""
     echo "  ]"
@@ -129,12 +152,13 @@ case "$MODE" in
     echo "=== results ==="
     echo "  passed: $CHECKS_PASS / $CHECKS_TOTAL"
     echo "  score:  $SCORE/100"
-    [ $CHECKS_FAIL -gt 0 ] && echo "  fails:  $CHECKS_FAIL"
-    echo ""
     if [ $CHECKS_FAIL -gt 0 ]; then
+      echo ""
       echo "  failing checks:"
       while IFS='|' read -r status name detail; do
-        [ "$status" = "FAIL" ] && echo "    - $name ($detail)"
+        if [ "$status" = "FAIL" ]; then
+          echo "    - $name ($detail)"
+        fi
       done <<< "$RESULTS"
     fi
     ;;

@@ -16,7 +16,8 @@ Key design:
 
 - Modular checkers (bash functions): repo integrity, scripts, git, capabilities, harness integrity
 - Output modes: normal (human-readable), verbose, score (numeric only), json (machine-readable)
-- 22 checks total; initial score 86/100 (failures: uncommitted eval, missing model config, missing tests)
+- Initial score 83/100 (failures: working tree clean, missing model config, missing tests)
 - `--json` output designed for consumption by `scripts/improve` in future sessions
+- Bugfix: functions were not `set -e` safe — `[ cond ] && echo` as last statement returned exit code 1 in normal mode, crashing the script silently. Refactored to use `if` blocks and `verbose_echo` helper.
 
 Seed created.
