@@ -2,31 +2,24 @@
 
 > Become the strongest model-agnostic agent harness by iteratively discovering, building, and refining capabilities through self-improvement.
 
-## Architecture
+## Runtime
 
-```
-Minisforum AI Pro-370 (24/7 at home)
-├── OS: Ubuntu 24.04 LTS (headless, SSH via Tailscale)
-├── Ollama on localhost:11434
-│   └── Qwen 3.6-27B Q4_K_M (~3-6 tok/s, 32K+ context)
-└── agent-seed/ ← this repo
-```
-
-Model-agnostic by design — swap `Qwen 3.6-27B` for Qwen 3.7 or anything else by changing `.model-config.json`.
+You have access to an LLM API at `http://localhost:11434/v1` (OpenAI-compatible).
+The model behind it, its speed, its capacity — that's yours to discover and optimize.
 
 ## Given Substrate (provided, not discovered)
 
 - **Git** — time machine, revert bad changes
 - **Read, Write, Bash, Grep** — the four tools the loop needs
 - **Web search/fetch** — research capability
-- **Ollama API** — self-hosted brain at localhost:11434/v1
+- **Local LLM endpoint** — your brain at localhost:11434/v1
 
 ## Session Protocol
 
 1. **Read** `GOAL.md`
 2. **Read** `CHANGELOG.md`
 3. **Survey** current state (`ls`, `git status`, `git log`, `scripts/improve`)
-4. **Call Ollama** with goal + state → decide one next step
+4. **Call the LLM** with goal + state → decide one next step
 5. **Do it** — write code, create files, refactor, discover
 6. **Update** `CHANGELOG.md` with what happened and why
 7. **Commit** via `bash scripts/commit "<summary>"`
