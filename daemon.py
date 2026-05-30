@@ -64,6 +64,78 @@ BLOCKED_PATHS: list[str] = [
     ".git/",
 ]
 
+# ── Token drift mitigation constants ────────────────────────────────
+
+SCAN_MARKER = """[SELF-CHECK]
+Pause. Before proceeding:
+1. What session turn am I on? (rough estimate based on context length)
+2. Am I repeating a previous action? Check git log for recent duplicates.
+3. Is the goal still: advance the strongest model-agnostic agent harness?
+4. What is the single next step that most advances this goal?
+
+If you detect repetition, drift, or context degradation, stop and summarize
+what you've done so far, then identify the next distinct step. Do NOT repeat
+the last action unless there's evidence it failed.
+"""
+
+CONTEXT_SUMMARY_TRIGGER = int(os.environ.get("AGENT_SEED_CONTEXT_BYTES", "4000"))
+"""Task prompt bytes above this trigger sliding-window summarization."""
+
+WINDOW_KEEP_VERBATIM = int(os.environ.get("AGENT_SEED_WINDOW_KEEP", "1500"))
+"""Keep this many bytes verbatim from the end of the task prompt. Summarize everything older."""
+
+
+def inject_scan_marker(task: str) -> str:
+    """Inject a SCAN marker before the task to re-focus the model and detect drift."""
+    return SCAN_MARKER + "\n\n" + task
+
+
+def summarize_if_long(task: str) -> str:
+    """Apply sliding-window summarization if the task prompt exceeds threshold."""
+    if len(task.encode("utf-8")) <= CONTEXT_SUMMARY_TRIGGER:
+        return task
+
+    # Keep the end verbatim (recent state, eval score, changelog)
+    keep_bytes = min(WINDOW_KEEP_VERBATIM, len(task.encode("utf-8")) // 2)
+    task_bytes = task.encode("utf-8")
+    cutoff = len(task_bytes) - keep_bytes
+    # Find clean byte boundary
+    while cutoff > 0 and cutoff < len(task_bytes) and task_bytes[cutoff] & 0xC0 == 0x80:
+        cutoff -= 1
+    old_part = task_bytes[:cutoff].decode("utf-8", errors="replace")
+    recent_part = task_bytes[cutoff:].decode("utf-8", errors="replace")
+
+    # Summarize old part by truncating to key sections
+    lines = old_part.split("\n")
+    summary_lines: list[str] = []
+    seen_goal = False
+    for line in lines:
+        if line.startswith("GOAL:") and not seen_goal:
+            summary_lines.append(line)
+            seen_goal = True
+        elif line.startswith("Eval score:"):
+            summary_lines.append(line + " (see below for full)")
+        elif line.startswith("CHANGELOG"):
+            summary_lines.append(line)
+        elif line.startswith("Current state"):
+            summary_lines.append(line)
+        elif (
+            line.strip()
+            and summary_lines
+            and summary_lines[-1].startswith("Current state")
+        ):
+            summary_lines.append("  [...] summarized — full output below")
+            summary_lines.append("")
+
+    summarized = "\n".join(summary_lines)
+    result = f"[CONTEXT SUMMARIZED — older sections collapsed to key markers]\n\n{summarized}\n\n---\n\n{recent_part}"
+    log(
+        f"Context compressed: {len(task.encode('utf-8'))} -> {len(result.encode('utf-8'))} bytes "
+        f"(kept last {keep_bytes}b verbatim)"
+    )
+    return result
+
+
 # ── Configuration (can be overridden via env vars) ────────────────────
 
 LLM_API_BASE = os.environ.get("AGENT_SEED_API_BASE", "http://localhost:11434/v1")
@@ -469,6 +541,10 @@ def main() -> None:
             log(f"Failed to read state: {e}")
             time.sleep(SLEEP_ON_FAILURE)
             continue
+
+        # ── Token drift mitigation: SCAN marker + sliding-window ────
+        task = inject_scan_marker(task)
+        task = summarize_if_long(task)
 
         # 2. Run agent
         try:

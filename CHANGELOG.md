@@ -75,3 +75,12 @@ Completed the 5-layer safety architecture. Layers 1-2 (step timeout + git checkp
 - **Layer 5 — Post-modification health check + auto-rollback**: after each iteration, runs 3 checks (model-config parseable, `scripts/eval --json` passes, `tests/smoke.sh --quick` doesn't crash). If ANY fails: reverts working tree via `git checkout -- .`, undoes the commit via `git reset HEAD~2`, logs the rollback. Env var: `AGENT_SEED_HEALTH_TIMEOUT`.
 
 All 5 layers now implemented. Daemon is ready for MiniPC deployment.
+
+## 2026-05-30 :: add token drift mitigations — SCAN marker + sliding-window
+
+Added two token drift mitigations to the daemon task pipeline (between state reading and agent execution):
+
+- **SCAN marker**: ~300 token self-check injected before every task. Prompts the model to verify it's not repeating actions, check context length, re-anchor to goal, and identify the next distinct step.
+- **Sliding-window summarization**: when the task prompt exceeds `AGENT_SEED_CONTEXT_BYTES` (default 4000 bytes), the older portion is collapsed to key markers (GOAL, eval score, changelog header) while the last `AGENT_SEED_WINDOW_KEEP` (default 1500) bytes are kept verbatim. This prevents context-length-triggered token drift without losing recent state.
+
+These complement the q8_0 KV cache flag (llama.cpp server config, set at deployment time) and session boundaries with git checkpoint (already implemented via iteration commits).
