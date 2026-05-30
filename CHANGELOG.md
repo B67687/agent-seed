@@ -52,4 +52,16 @@ Created `tests/` directory with `tests/smoke.sh` — a comprehensive smoke test 
 
 Eval score hits **100/100** for the first time after this commit. All capability gaps closed.
 
+## 2026-05-30 :: add self-improvement daemon
+
+Created `daemon.py` — the autonomous self-improvement loop that runs 24/7 on the MiniPC. Wraps mini-swe-agent v2.3.0 in a while-true loop with:
+
+- **State aggregation**: reads GOAL.md + CHANGELOG.md + `scripts/improve` output to build task context
+- **Safety invariants** (hardcoded in Python, not in AI prompt): blocks `rm -rf`, `git reset --hard`, `pip uninstall`, path modifications to daemon.py/AGENTS.md/GOAL.md
+- **Resource limits**: configurable max_steps (25), cost_limit ($0.50), wall_time (300s)
+- **Failure recovery**: adaptive backoff (30s base → 5min on failure → 15min after 3 consecutive failures)
+- **Git checkpoint after every modification**: auto-commit + changelog update
+- **Environment variables**: AGENT_SEED_API_BASE, AGENT_SEED_MODEL, AGENT_SEED_MAX_STEPS, AGENT_SEED_COST_LIMIT, AGENT_SEED_WALL_TIME, AGENT_SEED_SLEEP_BASE, AGENT_SEED_SLEEP_FAIL, AGENT_SEED_MAX_FAILURES
+- **Systemd-ready**: clean shutdown on SIGINT, structured logging, exit codes
+
 Seed created.
