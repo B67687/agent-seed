@@ -13,9 +13,11 @@ Safety invariants are hardcoded here (Python level), NOT in the AI prompt.
 
 from __future__ import annotations
 
+import gzip
 import json
 import os
 import re
+import shutil
 import subprocess
 import sys
 import time
@@ -72,6 +74,12 @@ WALL_TIME_LIMIT = int(os.environ.get("AGENT_SEED_WALL_TIME", "300"))  # seconds
 SLEEP_BASE = int(os.environ.get("AGENT_SEED_SLEEP_BASE", "30"))  # seconds
 SLEEP_ON_FAILURE = int(os.environ.get("AGENT_SEED_SLEEP_FAIL", "300"))  # 5 min
 MAX_CONSECUTIVE_FAILURES = int(os.environ.get("AGENT_SEED_MAX_FAILURES", "3"))
+
+# Layer 3 (filesystem quota) and Layer 5 (health check) configuration
+DISK_WARN_MB = int(os.environ.get("AGENT_SEED_DISK_WARN_MB", "1024"))
+LOG_KEEP = int(os.environ.get("AGENT_SEED_LOG_KEEP", "5"))
+HEALTH_TIMEOUT = int(os.environ.get("AGENT_SEED_HEALTH_TIMEOUT", "60"))
+
 OUTPUT_DIR = REPO_ROOT / ".daemon-output"
 OUTPUT_DIR.mkdir(exist_ok=True)
 
@@ -117,6 +125,42 @@ def run_shell(command: str, timeout: int = 60) -> dict:
         return {"exit_code": -1, "output": "Command timed out"}
     except Exception as e:
         return {"exit_code": -1, "output": str(e)}
+
+
+# ── Layer 3: Filesystem quota + logrotate ────────────────────────────
+
+
+def check_disk_quota() -> bool:
+    """Check if free disk space is above the warning threshold. Returns True if OK."""
+    usage = shutil.disk_usage(REPO_ROOT)
+    free_mb = usage.free / (1024 * 1024)
+    if free_mb < DISK_WARN_MB:
+        log(
+            f"DISK QUOTA: {free_mb:.0f} MB free (threshold: {DISK_WARN_MB} MB)"
+            " — skipping iteration"
+        )
+        return False
+    log(f"Disk OK: {free_mb:.0f} MB free")
+    return True
+
+
+def rotate_logs() -> None:
+    """Rotate log files in .daemon-output/ — keep last N, compress older ones."""
+    logs = sorted(
+        OUTPUT_DIR.glob("*.log"), key=lambda p: p.stat().st_mtime, reverse=True
+    )
+    if len(logs) <= LOG_KEEP:
+        return
+    for old in logs[LOG_KEEP:]:
+        compressed = old.with_suffix(old.suffix + ".gz")
+        try:
+            with open(old, "rb") as f_in:
+                with gzip.open(compressed, "wb") as f_out:
+                    f_out.writelines(f_in)
+            old.unlink()
+            log(f"Rotated (compressed): {old.name}")
+        except OSError as e:
+            log(f"Log rotation failed for {old.name}: {e}")
 
 
 def read_goal_and_state() -> str:
@@ -190,6 +234,94 @@ def update_changelog(result: dict) -> None:
     log("Updated CHANGELOG.md")
 
 
+# ── Layer 4: Schema validation for config changes ─────────────────────
+
+
+def validate_model_config_schema(data: dict) -> list[str]:
+    """Validate .model-config.json structure. Returns list of error messages (empty = valid)."""
+    errors: list[str] = []
+    if "providers" not in data:
+        errors.append("missing required field: 'providers'")
+    elif not isinstance(data["providers"], dict):
+        errors.append("'providers' must be an object")
+
+    if "routes" not in data:
+        errors.append("missing required field: 'routes'")
+    elif not isinstance(data["routes"], dict):
+        errors.append("'routes' must be an object")
+
+    if "routes" in data and isinstance(data["routes"], dict):
+        for route_name, route_config in data["routes"].items():
+            if not isinstance(route_config, dict):
+                errors.append(f"route '{route_name}' must be an object")
+                continue
+            if "model" not in route_config:
+                errors.append(f"route '{route_name}' missing required field: 'model'")
+            elif not isinstance(route_config["model"], str):
+                errors.append(f"route '{route_name}':'model' must be a string")
+            if "access" not in route_config:
+                errors.append(f"route '{route_name}' missing required field: 'access'")
+            elif route_config["access"] not in ("read_write", "read_only"):
+                errors.append(
+                    f"route '{route_name}':'access' must be 'read_write' or 'read_only'"
+                )
+
+    if "providers" in data and isinstance(data["providers"], dict):
+        for provider_name, provider_config in data["providers"].items():
+            if not isinstance(provider_config, dict):
+                errors.append(f"provider '{provider_name}' must be an object")
+                continue
+            if "type" not in provider_config:
+                errors.append(
+                    f"provider '{provider_name}' missing required field: 'type'"
+                )
+
+    return errors
+
+
+def validate_json_changes() -> None:
+    """Validate JSON files modified in the last iteration. Reverts invalid files."""
+    # Determine diff range: HEAD~2 for agent work + changelog, fallback to ~1
+    diff = run_shell(
+        "git diff --name-only HEAD~2 HEAD 2>/dev/null"
+        " || git diff --name-only HEAD~1 HEAD 2>/dev/null"
+        " || echo ''",
+        timeout=10,
+    )
+    if diff["exit_code"] != 0:
+        return
+    changed_files = [f.strip() for f in diff["output"].split("\n") if f.strip()]
+    json_files = [f for f in changed_files if f.endswith(".json")]
+    if not json_files:
+        return
+
+    for jf in json_files:
+        filepath = REPO_ROOT / jf
+        if not filepath.exists():
+            continue
+
+        # Check 1: parseable JSON
+        try:
+            data = json.loads(filepath.read_text())
+        except json.JSONDecodeError as e:
+            log(f"VALIDATION FAILED: {jf} is not valid JSON: {e}")
+            run_shell(f"git checkout -- {jf}", timeout=10)
+            log(f"VALIDATION ACTION: reverted {jf}")
+            continue
+
+        # Check 2: schema validation for .model-config.json
+        if Path(jf).name == ".model-config.json":
+            errors = validate_model_config_schema(data)
+            if errors:
+                log(f"VALIDATION FAILED: {jf} schema errors: {'; '.join(errors)}")
+                run_shell(f"git checkout -- {jf}", timeout=10)
+                log(f"VALIDATION ACTION: reverted {jf}")
+            else:
+                log(f"VALIDATION OK: {jf} passes schema check")
+        else:
+            log(f"VALIDATION OK: {jf} is valid JSON")
+
+
 def adaptive_sleep(result: dict) -> int:
     """Determine sleep duration based on result. Returns seconds."""
     exit_status = result.get("exit_status", "")
@@ -199,6 +331,71 @@ def adaptive_sleep(result: dict) -> int:
         return SLEEP_ON_FAILURE  # Failure — back off
     else:
         return SLEEP_BASE * 2
+
+
+# ── Layer 5: Post-modification health check + auto-rollback ────────────
+
+
+def health_check_and_rollback() -> bool:
+    """Run health checks after commit. Rolls back all changes on failure. Returns True if passed."""
+    checks_passed = True
+
+    # Health check 1: .model-config.json is valid JSON
+    model_config = REPO_ROOT / ".model-config.json"
+    if model_config.exists():
+        check1 = run_shell(
+            "python3 -c \"import json; json.load(open('.model-config.json'))\"",
+            timeout=HEALTH_TIMEOUT,
+        )
+        if check1["exit_code"] != 0:
+            log(
+                "HEALTH CHECK 1 FAILED: .model-config.json is not valid JSON:"
+                f" {check1['output'][:200]}"
+            )
+            checks_passed = False
+
+    # Health check 2: bash scripts/eval --json — verify exit code 0 and JSON output
+    eval_script = REPO_ROOT / "scripts" / "eval"
+    if eval_script.exists():
+        check2 = run_shell("bash scripts/eval --json", timeout=HEALTH_TIMEOUT)
+        if check2["exit_code"] != 0:
+            log(
+                "HEALTH CHECK 2 FAILED: scripts/eval --json returned non-zero:"
+                f" {check2['output'][:200]}"
+            )
+            checks_passed = False
+        else:
+            try:
+                json.loads(check2["output"])
+            except json.JSONDecodeError:
+                log(
+                    "HEALTH CHECK 2 FAILED: scripts/eval --json output is not valid JSON"
+                )
+                checks_passed = False
+
+    # Health check 3: bash tests/smoke.sh --quick — verify it doesn't crash
+    smoke_test = REPO_ROOT / "tests" / "smoke.sh"
+    if smoke_test.exists():
+        check3 = run_shell("bash tests/smoke.sh --quick", timeout=HEALTH_TIMEOUT)
+        if check3["exit_code"] != 0:
+            log(
+                "HEALTH CHECK 3 FAILED: tests/smoke.sh --quick crashed:"
+                f" {check3['output'][:200]}"
+            )
+            checks_passed = False
+
+    if checks_passed:
+        log("All health checks passed")
+        return True
+
+    # ── Rollback ──────────────────────────────────────────────────────
+    log(
+        "ROLLBACK: all health checks did not pass — reverting changes from this iteration"
+    )
+    run_shell("git checkout -- .", timeout=15)
+    run_shell("git reset HEAD~2", timeout=10)
+    log("ROLLBACK: complete — working tree reverted, commits undone")
+    return False
 
 
 # ── Safe environment factory ───────────────────────────────────────────
@@ -259,6 +456,12 @@ def main() -> None:
         log("=" * 60)
         log("Starting new iteration")
 
+        # ── Layer 3: Filesystem quota + logrotate ──────────────────
+        if not check_disk_quota():
+            time.sleep(SLEEP_BASE)
+            continue
+        rotate_logs()
+
         # 1. Build task context
         try:
             task = read_goal_and_state()
@@ -300,6 +503,25 @@ def main() -> None:
                 f'git add -A && git commit -m "daemon: update changelog after iteration"',
                 timeout=15,
             )
+
+        # ── Layer 4: Schema validation for config changes ──────────
+        validate_json_changes()
+
+        # ── Layer 5: Post-modification health check + auto-rollback ──
+        if committed:
+            if not health_check_and_rollback():
+                consecutive_failures += 1
+                log(f"Health check failure #{consecutive_failures}")
+                if consecutive_failures >= MAX_CONSECUTIVE_FAILURES:
+                    log(
+                        f"{MAX_CONSECUTIVE_FAILURES} consecutive health failures"
+                        " — escalating sleep"
+                    )
+                    time.sleep(SLEEP_ON_FAILURE * 3)
+                    consecutive_failures = 0
+                else:
+                    time.sleep(SLEEP_ON_FAILURE)
+                continue
 
         # 5. Reset failure counter on success
         if result.get("exit_status") == "submitted":
