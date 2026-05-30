@@ -65,3 +65,13 @@ Created `daemon.py` — the autonomous self-improvement loop that runs 24/7 on t
 - **Systemd-ready**: clean shutdown on SIGINT, structured logging, exit codes
 
 Seed created.
+
+## 2026-05-30 :: add safety layers 3-5 — disk quota, config validation, health check
+
+Completed the 5-layer safety architecture. Layers 1-2 (step timeout + git checkpoint) were in the initial daemon. Added:
+
+- **Layer 3 — Filesystem quota + logrotate**: checks free disk space before each iteration (default warn <1GB), auto-compresses old logs in `.daemon-output/`, keeps last 5. Env vars: `AGENT_SEED_DISK_WARN_MB`, `AGENT_SEED_LOG_KEEP`.
+- **Layer 4 — Schema validation for config changes**: detects JSON files modified by the agent, validates they're parseable JSON. For `.model-config.json`, validates required schema fields (`routes`, `providers` with types). Auto-reverts invalid files via `git checkout -- <path>`.
+- **Layer 5 — Post-modification health check + auto-rollback**: after each iteration, runs 3 checks (model-config parseable, `scripts/eval --json` passes, `tests/smoke.sh --quick` doesn't crash). If ANY fails: reverts working tree via `git checkout -- .`, undoes the commit via `git reset HEAD~2`, logs the rollback. Env var: `AGENT_SEED_HEALTH_TIMEOUT`.
+
+All 5 layers now implemented. Daemon is ready for MiniPC deployment.
