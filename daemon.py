@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-import subprocess, time
+import subprocess, time, tempfile, os
 from datetime import datetime, timezone
 from pathlib import Path
 from openai import OpenAI
@@ -47,9 +47,13 @@ while True:
         if l.startswith("$ "):
             log(f"> {l[2:]}")
             log(sh(l[2:]))
-    # Use AI's first line as commit message
     msg = txt.strip().split("\n")[0][:80] if txt.strip() else "auto"
-    log(sh("git add -A 2>/dev/null || true"))
-    log(sh('git commit -m "' + msg + '" 2>/dev/null || true'))
-    log(sh("git push origin main 2>/dev/null || echo push-failed"))
+    # Use temp file for commit message to avoid quote escaping issues
+    mf = tempfile.mktemp()
+    with open(mf, "w") as fh:
+        fh.write(msg)
+    sh("git add -A 2>/dev/null || true")
+    sh(f"git commit -F {mf} 2>/dev/null || true")
+    os.unlink(mf)
+    sh("git push origin main 2>/dev/null || echo push-failed")
     time.sleep(60)
