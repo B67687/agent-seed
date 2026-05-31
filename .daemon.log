@@ -126,3 +126,24 @@ Completed the 5-layer safety architecture. Layers 1-2 (step timeout + git checkp
 [2026-05-31T14:44:43Z] > echo "## 2026-05-30 :: add token drift mitigations — SCAN marker + sliding-window" >> CHANGELOG.md && echo "" >> CHANGELOG.md && echo "- **SCAN marker**: ~300 token self-check injected before every task. Prompts the model to verify it's not repeating actions, check context length, re-anchor to goal, and identify the next distinct step." >> CHANGELOG.md && echo "- **Sliding-window summarization**: when the task prompt exceeds \`AGENT_SEED_CONTEXT_BYTES\` (default 4000 bytes), the older portion is collapsed to key markers (GOAL, eval score, changelog header) while the last \`AGENT_SEED_WINDOW_KEEP\` (default 1500) bytes are kept verbatim. This prevents context-length-triggered token drift without losing recent state." >> CHANGELOG.md && echo "" >> CHANGELOG.md && echo "These complement the q8_0
 [2026-05-31T14:44:43Z] bash: -c: line 1: unexpected EOF while looking for matching `"'
 
+[2026-05-31T14:45:43Z] start
+[2026-05-31T14:45:43Z] ========================================
+[2026-05-31T14:45:43Z] LLM (2083c)...
+[2026-05-31T14:46:09Z] start
+[2026-05-31T14:46:09Z] ========================================
+[2026-05-31T14:46:09Z] LLM (2083c)...
+[2026-05-31T14:46:37Z] OK 54s (19c): $ ./scripts/improve
+[2026-05-31T14:46:37Z] > ./scripts/improve
+[2026-05-31T14:46:37Z] === agent-seed :: self-improvement loop ===
+
+--- GOAL ---
+Become the strongest model-agnostic agent harness by iteratively discovering, building, and refining capabilities through self-improvement.
+
+--- CHANGELOG (tail) ---
+Seed created.
+
+## 2026-05-30 :: add safety layers 3-5 — disk quota, config validation, health check
+
+Completed the 5-layer safety architecture. Layers 1-2 (step timeout + git checkpoint) were in the initial daemon. Added:
+
+- **Layer 3 — Filesystem quota + logrotate**: checks 
