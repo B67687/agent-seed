@@ -254,3 +254,15 @@ Completed the 5-layer safety architecture. Layers 1-2 (step timeout + git checkp
 
 - **Layer 3 — Filesystem quota + logrotate**: checks 
 [2026-05-31T15:02:48Z] OK 49s (20c): $. ./scripts/improve
+[2026-05-31T15:03:06Z] ========================================
+[2026-05-31T15:03:06Z] LLM (2083c)...
+[2026-05-31T15:03:48Z] ========================================
+[2026-05-31T15:03:48Z] LLM (2083c)...
+[2026-05-31T15:05:35Z] start
+[2026-05-31T15:05:35Z] ========================================
+[2026-05-31T15:05:35Z] LLM (2096c)...
+[2026-05-31T15:06:08Z] start
+[2026-05-31T15:06:08Z] ========================================
+[2026-05-31T15:06:08Z] LLM (2096c)...
+[2026-05-31T15:07:59Z] OK 111s (110c): $ git add -A && git commit -m "feat: add token drift mitigations (SCAN marker + sliding-window summarization)"
+[2026-05-31T15:07:59Z] > git add -A && git commit -m "feat: add token drift mitigations (SCAN marker + sliding-window summarization)"
