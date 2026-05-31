@@ -253,3 +253,4 @@ Seed created.
 Completed the 5-layer safety architecture. Layers 1-2 (step timeout + git checkpoint) were in the initial daemon. Added:
 
 - **Layer 3 — Filesystem quota + logrotate**: checks 
+[2026-05-31T15:02:48Z] OK 49s (20c): $. ./scripts/improve
