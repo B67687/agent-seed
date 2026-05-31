@@ -215,3 +215,5 @@ Completed the 5-layer safety architecture. Layers 1-2 (step timeout + git checkp
 [2026-05-31T14:57:02Z] [main 2be0b72] feat: add token drift mitigations (SCAN marker + sliding-window summarization)
  1 file changed, 6 insertions(+)
 
+[2026-05-31T14:57:30Z] OK 136s (96c): $ git add -A && git commit -m "feat: add token drift mitigations (SCAN marker + sliding-window)"
+[2026-05-31T14:57:30Z] > git add -A && git commit -m "feat: add token drift mitigations (SCAN marker + sliding-window)"
