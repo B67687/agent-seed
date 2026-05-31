@@ -234,3 +234,22 @@ Completed the 5-layer safety architecture. Layers 1-2 (step timeout + git checkp
 [2026-05-31T15:00:58Z] [main 60bed40] feat: implement 5-layer safety harness + token drift mitigations
  1 file changed, 2 insertions(+)
 
+[2026-05-31T15:01:16Z] ========================================
+[2026-05-31T15:01:16Z] LLM (2136c)...
+[2026-05-31T15:01:58Z] ========================================
+[2026-05-31T15:01:58Z] LLM (2136c)...
+[2026-05-31T15:02:06Z] OK 50s (19c): $ ./scripts/improve
+[2026-05-31T15:02:06Z] > ./scripts/improve
+[2026-05-31T15:02:06Z] === agent-seed :: self-improvement loop ===
+
+--- GOAL ---
+Become the strongest model-agnostic agent harness by iteratively discovering, building, and refining capabilities through self-improvement.
+
+--- CHANGELOG (tail) ---
+Seed created.
+
+## 2026-05-30 :: add safety layers 3-5 — disk quota, config validation, health check
+
+Completed the 5-layer safety architecture. Layers 1-2 (step timeout + git checkpoint) were in the initial daemon. Added:
+
+- **Layer 3 — Filesystem quota + logrotate**: checks 
