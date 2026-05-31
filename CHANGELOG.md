@@ -53,3 +53,4 @@ Created `tests/` directory with `tests/smoke.sh` — a comprehensive smoke test 
 Eval score hits **100/100** for the first time after this commit. All capability gaps closed.
 
 Seed created.
+100/100 eval achieved. Self-improvement loop integrated. Seed created.
