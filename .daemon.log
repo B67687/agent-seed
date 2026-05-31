@@ -229,3 +229,5 @@ Completed the 5-layer safety architecture. Layers 1-2 (step timeout + git checkp
 [2026-05-31T15:00:16Z] [main ed17344] feat: add token drift mitigations (SCAN marker + sliding-window)
  1 file changed, 6 insertions(+)
 
+[2026-05-31T15:00:57Z] OK 147s (96c): $ git add -A && git commit -m "feat: implement 5-layer safety harness + token drift mitigations"
+[2026-05-31T15:00:57Z] > git add -A && git commit -m "feat: implement 5-layer safety harness + token drift mitigations"
