@@ -47,7 +47,13 @@ while True:
             if l.startswith("$ "):
                 log(f"> {l[2:]}")
                 log(sh(l[2:]))
-        msg = txt.strip().split("\n")[0][:80] if txt.strip() else "auto"
+        # Find first non-command line as commit message
+        msg = "auto"
+        for line in txt.strip().split("\n"):
+            line = line.strip()
+            if line and not line.startswith("$ ") and not line.startswith("```"):
+                msg = line[:80]
+                break
         mf = tempfile.mktemp()
         with open(mf, "w") as fh:
             fh.write(msg)

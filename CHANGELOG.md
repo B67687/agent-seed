@@ -52,35 +52,4 @@ Created `tests/` directory with `tests/smoke.sh` — a comprehensive smoke test 
 
 Eval score hits **100/100** for the first time after this commit. All capability gaps closed.
 
-## 2026-05-30 :: add self-improvement daemon
-
-Created `daemon.py` — the autonomous self-improvement loop that runs 24/7 on the MiniPC. Wraps mini-swe-agent v2.3.0 in a while-true loop with:
-
-- **State aggregation**: reads GOAL.md + CHANGELOG.md + `scripts/improve` output to build task context
-- **Safety invariants** (hardcoded in Python, not in AI prompt): blocks `rm -rf`, `git reset --hard`, `pip uninstall`, path modifications to daemon.py/AGENTS.md/GOAL.md
-- **Resource limits**: configurable max_steps (25), cost_limit ($0.50), wall_time (300s)
-- **Failure recovery**: adaptive backoff (30s base → 5min on failure → 15min after 3 consecutive failures)
-- **Git checkpoint after every modification**: auto-commit + changelog update
-- **Environment variables**: AGENT_SEED_API_BASE, AGENT_SEED_MODEL, AGENT_SEED_MAX_STEPS, AGENT_SEED_COST_LIMIT, AGENT_SEED_WALL_TIME, AGENT_SEED_SLEEP_BASE, AGENT_SEED_SLEEP_FAIL, AGENT_SEED_MAX_FAILURES
-- **Systemd-ready**: clean shutdown on SIGINT, structured logging, exit codes
-
 Seed created.
-
-## 2026-05-30 :: add safety layers 3-5 — disk quota, config validation, health check
-
-Completed the 5-layer safety architecture. Layers 1-2 (step timeout + git checkpoint) were in the initial daemon. Added:
-
-- **Layer 3 — Filesystem quota + logrotate**: checks free disk space before each iteration (default warn <1GB), auto-compresses old logs in `.daemon-output/`, keeps last 5. Env vars: `AGENT_SEED_DISK_WARN_MB`, `AGENT_SEED_LOG_KEEP`.
-- **Layer 4 — Schema validation for config changes**: detects JSON files modified by the agent, validates they're parseable JSON. For `.model-config.json`, validates required schema fields (`routes`, `providers` with types). Auto-reverts invalid files via `git checkout -- <path>`.
-- **Layer 5 — Post-modification health check + auto-rollback**: after each iteration, runs 3 checks (model-config parseable, `scripts/eval --json` passes, `tests/smoke.sh --quick` doesn't crash). If ANY fails: reverts working tree via `git checkout -- .`, undoes the commit via `git reset HEAD~2`, logs the rollback. Env var: `AGENT_SEED_HEALTH_TIMEOUT`.
-
-All 5 layers now implemented. Daemon is ready for MiniPC deployment.
-
-## 2026-05-30 :: add token drift mitigations — SCAN marker + sliding-window
-
-Added two token drift mitigations to the daemon task pipeline (between state reading and agent execution):
-
-- **SCAN marker**: ~300 token self-check injected before every task. Prompts the model to verify it's not repeating actions, check context length, re-anchor to goal, and identify the next distinct step.
-- **Sliding-window summarization**: when the task prompt exceeds `AGENT_SEED_CONTEXT_BYTES` (default 4000 bytes), the older portion is collapsed to key markers (GOAL, eval score, changelog header) while the last `AGENT_SEED_WINDOW_KEEP` (default 1500) bytes are kept verbatim. This prevents context-length-triggered token drift without losing recent state.
-
-These complement the q8_0 KV cache flag (llama.cpp server config, set at deployment time) and session boundaries with git checkpoint (already implemented via iteration commits).
