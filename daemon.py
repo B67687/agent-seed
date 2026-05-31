@@ -36,5 +36,6 @@ while True:
         if l.startswith("$ "):
             log(f"> {l[2:]}")
             log(sh(l[2:]))
-    sh("git add -A && git commit -m daemon-auto 2>/dev/null || true")
+    sh("git add -A sh("git add -A && git commit -m daemon-auto 2>/dev/null || true")sh("git add -A && git commit -m daemon-auto 2>/dev/null || true") git commit -m daemon-auto 2>/dev/null || true")
+        sh("git push origin main 2>/dev/null || echo push-failed")
     time.sleep(60)

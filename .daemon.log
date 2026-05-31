@@ -147,3 +147,17 @@ Seed created.
 Completed the 5-layer safety architecture. Layers 1-2 (step timeout + git checkpoint) were in the initial daemon. Added:
 
 - **Layer 3 — Filesystem quota + logrotate**: checks 
+[2026-05-31T14:47:13Z] OK 64s (118c): $ git add CHANGELOG.md && git commit -m "daemon-auto: document token drift mitigations (SCAN marker + sliding-window)"
+[2026-05-31T14:47:13Z] > git add CHANGELOG.md && git commit -m "daemon-auto: document token drift mitigations (SCAN marker + sliding-window)"
+[2026-05-31T14:47:13Z] On branch main
+Your branch is ahead of 'origin/main' by 6 commits.
+  (use "git push" to publish your local commits)
+
+Changes not staged for commit:
+  (use "git add <file>..." to update what will be committed)
+  (use "git restore <file>..." to discard changes in working directory)
+	modified:   .daemon.log
+	modified:   daemon.py
+
+no changes added to commit (use "git add" and/or "git commit -a")
+
