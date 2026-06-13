@@ -74,7 +74,7 @@ ROUTE_LIST=$(bash scripts/route --list 2>&1) && pass "route — list mode" || fa
 echo "$ROUTE_LIST" | grep -q "routes" && pass "route — list shows routes" || fail "route — list shows routes" "not found"
 
 ROUTE_RESOLVE=$(bash scripts/route explore 2>&1) && pass "route — resolve 'explore'" || fail "route — resolve 'explore'" "exit code $?"
-echo "$ROUTE_RESOLVE" | grep -q "deepseek-v4-flash-free" && pass "route — resolved to correct model" || fail "route — resolved to correct model" "got: $ROUTE_RESOLVE"
+echo "$ROUTE_RESOLVE" | grep -q "qwen3.6:27b" && pass "route — resolved to correct model" || fail "route — resolved to correct model" "got: $ROUTE_RESOLVE"
 
 # Unknown task type should fail
 ROUTE_UNKNOWN=$(bash scripts/route nonexistent 2>&1) && fail "route — unknown task fails" "should have failed" || pass "route — unknown task fails as expected"
@@ -98,7 +98,7 @@ section "Config files"
 
 [ -f .model-config.json ] && pass ".model-config.json exists" || fail ".model-config.json exists" "missing"
 jq empty .model-config.json 2>/dev/null && pass ".model-config.json is valid JSON" || fail ".model-config.json is valid JSON" "parse error"
-[ -f .opencode.jsonc ] && pass ".opencode.jsonc exists" || fail ".opencode.jsonc exists" "missing"
+# .opencode.jsonc was intentionally removed in the merger — not needed for agent-seed
 
 # ──────────────────────────────────
 # .gitignore

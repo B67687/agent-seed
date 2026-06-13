@@ -1,7 +1,0 @@
-{
-  // agent-seed — minimal config
-  // The AI reads AGENTS.md at session start and follows the protocol.
-  "startup": {
-    "instructions": "Read AGENTS.md and follow the session protocol.",
-  },
-}

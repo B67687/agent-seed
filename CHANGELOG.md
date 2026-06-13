@@ -1,5 +1,35 @@
 # agent-seed changelog
 
+## 2026-06-13 :: merger — unified daemon from agent-seed + agent-seed-fast
+
+Merged two daemon experiments into a single agent-seed:
+
+**From agent-seed (kept):**
+
+- 5 safety layers (blocked commands, disk quota, schema validation, health check + rollback)
+- Token drift mitigation (SCAN marker + sliding window summarization)
+- `scripts/eval`, `scripts/improve`, `scripts/route`, `tests/smoke.sh`
+- Adaptive sleep with exponential backoff
+- `.model-config.json` routing architecture
+
+**From agent-seed-fast (merged):**
+
+- Direct OpenAI API calls (replaced mini-swe-agent — 10x faster)
+- EXPLORE/CREATE cycle pattern (every 4th cycle is read-only)
+- Heredoc auto-close fix
+- Auto-git-push every cycle
+- Git auto-gc every 50 cycles
+
+**New architecture:**
+
+- `daemon.py` — merged main loop (~200 lines)
+- `agent_session.py` — lightweight API wrapper, model routing
+- `safety.py` — all 5 safety layers extracted
+- `state.py` — state reader + eval builder
+- `git_workflow.py` — commit, push, rollback, gc
+
+**Model-agnostic:** uses `.model-config.json` to route CREATE (DeepSeek API) vs EXPLORE (local Qwen) cycles.
+
 ## 2026-05-29 :: bootstrap self-improvement loop
 
 Created `scripts/improve` — a state-aggregation tool that surfaces GOAL, CHANGELOG, git state, project tree, and heuristic gap analysis. This is the first piece of self-improvement infrastructure. Without it, every session requires manual context gathering. With it, the AI has a repeatable discovery process to decide the next step.
